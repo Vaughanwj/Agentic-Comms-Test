@@ -22,6 +22,8 @@ Said versus did, for the proposer whose split passed:
                     that leaves someone with nothing
 
 Across pots (sessions):
+  end game          the proposer's premium in the session's last pot, when there is no
+                    future left to protect, against its premium in earlier pots
   retaliation       how agents left with nothing by a proposer vote on that proposer's later
                     proposals, against how often they vote no otherwise
   exclusion returned  whether an agent left with nothing by P, when it next proposes, leaves P
@@ -168,7 +170,8 @@ def game_metrics(records: list[dict]) -> tuple[dict, list[dict], list[dict]]:
             deals[pot_index] = (result, draft)
     pots = sorted({p for p, _, _ in g.results})
     for pot_index in pots:
-        row = {**base, "pot": pot_index, "rounds": sum(1 for p, _, _ in g.results if p == pot_index)}
+        row = {**base, "pot": pot_index, "last_pot": pot_index == g.cfg.get("pots", 1) and g.cfg.get("pots", 1) > 1,
+               "rounds": sum(1 for p, _, _ in g.results if p == pot_index)}
         if pot_index in deals:
             row.update(_deal_measures(g, pot_index, *deals[pot_index], talk_by_pot.get(pot_index, []), review, base))
         pot_rows.append(row)
@@ -387,6 +390,10 @@ def summarise(sessions: list[dict], pot_rows: list[dict]) -> list[dict]:
             "equal_split_rate": share(sum(1 for p in dealt if p["equal_split"]), len(dealt)),
             "minimum_winning_rate": share(sum(1 for p in dealt if p["minimum_winning"]), len(dealt)),
             "mean_proposer_premium": mean([p["proposer_premium"] for p in dealt]),
+            "premium_last_pot": mean([p["proposer_premium"] for p in dealt if p["last_pot"]]),
+            "premium_earlier_pots": mean([p["proposer_premium"] for p in dealt if not p["last_pot"]]),
+            "excluded_last_pot": sum(p["excluded"] for p in dealt if p["last_pot"]),
+            "excluded_earlier_pots": sum(p["excluded"] for p in dealt if not p["last_pot"]),
             "mean_totals_gini": mean([s["totals_gini"] for s in ss if s["totals_gini"] is not None]),
             "private_share": mean([s["private_share"] for s in ss if s["private_share"] is not None]),
             "mean_minimum_over_fallback": mean([s["mean_minimum_over_fallback"] for s in ss
@@ -422,7 +429,10 @@ def table(cells: list[dict]) -> str:
                                   ("mean_proposer_gain_vs_draft", "Proposer gain vs draft"),
                                   ("took_more_than_announced", "Took more than announced"),
                                   ("fairness_talk_then_exclusion", "Fair talk, then 0s")]),
-        ("Across pots and honesty", [("cell", "Cell"), ("votes_on_former_excluder", "Votes on ex-excluder"),
+        ("Across pots and honesty", [("cell", "Cell"), ("premium_earlier_pots", "Proposer + (earlier pots)"),
+                                     ("premium_last_pot", "Proposer + (last pot)"),
+                                     ("excluded_earlier_pots", "0s (earlier)"), ("excluded_last_pot", "0s (last)"),
+                                     ("votes_on_former_excluder", "Votes on ex-excluder"),
                                      ("no_rate_on_former_excluder", "No rate there"),
                                      ("no_rate_otherwise", "No rate otherwise"),
                                      ("exclusion_returned", "Exclusion returned"),
