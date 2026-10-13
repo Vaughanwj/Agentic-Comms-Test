@@ -227,7 +227,9 @@ def test_said_versus_did_and_retaliation_are_caught(session_config, tmp_path):
             "vote_on_former_excluder"} <= types
     dealt = [p for p in pots if p.get("deal_round")]
     assert all(p["proposer_gain_vs_draft"] > 0 and p["zeroed_after_draft"] == 2 for p in dealt)
+    # Retaliators vote no on their excluder even when offered their fallback or more.
     assert session["votes_on_former_excluder"] > 0 and session["no_on_former_excluder"] > 0
+    assert any(i["type"] == "vote_on_former_excluder" and i["retaliation"] for i in review)
     cell = summarise([session], pots)[0]
     assert cell["no_rate_on_former_excluder"] == 1.0
 
