@@ -29,7 +29,7 @@ python -m analysis.metrics records/dry-run
 
 ### Live runs
 
-Live runs use `claude-opus-5-5` at `medium` effort and need `ANTHROPIC_API_KEY` in the environment.
+Live runs use `claude-opus-5-5` at `medium` effort and need `ANTHROPIC_API_KEY` in the environment. If your key isn't tied to one workspace (the API says so with a 400), also set `ANTHROPIC_WORKSPACE_ID` to a `wrkspc_` ID; the harness sends it on every request. Keep both out of the repo.
 
 1. Start the sandbox network and egress proxy (once):
    ```bash

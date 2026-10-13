@@ -23,6 +23,7 @@ class LlmAgent(AgentPort):
         effort: str = "medium",
         max_tokens: int = 32000,
         proxy: str | None = None,
+        workspace_id: str | None = None,
         max_retries: int = 4,
         client: Any = None,
     ):
@@ -31,6 +32,7 @@ class LlmAgent(AgentPort):
         self.max_tokens = max_tokens
         self._client = client
         self._proxy = proxy
+        self._workspace_id = workspace_id
         self._max_retries = max_retries
         self._system = ""
         self._tools: list[dict] = []
@@ -43,7 +45,10 @@ class LlmAgent(AgentPort):
             import anthropic
 
             http_client = anthropic.DefaultHttpxClient(proxy=self._proxy) if self._proxy else None
-            self._client = anthropic.Anthropic(max_retries=self._max_retries, http_client=http_client)
+            # Keys not scoped to one workspace must name the workspace on every request.
+            headers = {"anthropic-workspace-id": self._workspace_id} if self._workspace_id else None
+            self._client = anthropic.Anthropic(max_retries=self._max_retries, http_client=http_client,
+                                               default_headers=headers)
         return self._client
 
     def start(self, system_prompt: str, tools: list[ToolSpec]) -> None:

@@ -62,6 +62,7 @@ def _play_in_docker(config: Config, game_index: int, run_id: str, agent_kind: st
         "--network", config.sandbox.network,
         "--read-only", "--tmpfs", "/tmp:rw,size=64m",
         "-e", "ANTHROPIC_API_KEY",
+        "-e", "ANTHROPIC_WORKSPACE_ID",
         "-v", f"{Path(config.records_dir).resolve()}:{CONTAINER_RECORDS}",
         "-v", f"{config.source_path}:{CONTAINER_CONFIG}:ro",
     ]

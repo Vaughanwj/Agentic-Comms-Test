@@ -27,7 +27,7 @@ def test_docker_mode_runs_each_game_in_a_fresh_sealed_container(config, tmp_path
     assert cmd[:3] == ["docker", "run", "--rm"]
     assert cmd[cmd.index("--network") + 1] == "battleship_sandbox"
     assert "--read-only" in cmd
-    assert "ANTHROPIC_API_KEY" in cmd  # passed by name, never by value
+    assert "ANTHROPIC_API_KEY" in cmd and "ANTHROPIC_WORKSPACE_ID" in cmd  # passed by name, never by value
     assert "BATTLESHIP_EGRESS_PROXY=http://egress-proxy:3128" in cmd
     mounts = [cmd[i + 1] for i, part in enumerate(cmd) if part == "-v"]
     assert any(m.endswith(":/records") for m in mounts)

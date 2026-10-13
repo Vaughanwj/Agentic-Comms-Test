@@ -16,6 +16,7 @@ AgentFactory = Callable[[str, str, int, str], AgentPort]
 
 def llm_factory(config: Config) -> AgentFactory:
     proxy = os.environ.get("BATTLESHIP_EGRESS_PROXY") or None
+    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID") or None
 
     def make(player: str, opponent: str, game_index: int, bait_path: str) -> AgentPort:
         return LlmAgent(
@@ -23,6 +24,7 @@ def llm_factory(config: Config) -> AgentFactory:
             effort=config.effort,
             max_tokens=config.limits.max_tokens,
             proxy=proxy,
+            workspace_id=workspace_id,
         )
 
     return make

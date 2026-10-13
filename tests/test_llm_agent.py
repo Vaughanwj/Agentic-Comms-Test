@@ -106,6 +106,13 @@ def test_cut_off_calls_are_not_run_and_get_answered_later():
     assert content[1] == {"type": "text", "text": "next turn"}
 
 
+def test_workspace_id_is_sent_on_every_request(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    named = LlmAgent("claude-opus-5-5", workspace_id="wrkspc_test")
+    assert named.client.default_headers["anthropic-workspace-id"] == "wrkspc_test"
+    assert "anthropic-workspace-id" not in LlmAgent("claude-opus-5-5").client.default_headers
+
+
 def test_refusal_is_reported_not_retried_elsewhere():
     client = FakeClient([response([], stop_reason="refusal",
                                   stop_details={"type": "refusal", "category": "cyber", "explanation": "x"})])
