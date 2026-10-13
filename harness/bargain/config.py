@@ -25,7 +25,10 @@ class BargainConfig:
     pot: int
     shrink: float
     max_rounds: int
+    pots: int
+    draft: bool
     talk_turns: int
+    counter_turns: int
     fallback_min: int
     fallback_max: int
     messaging: str
@@ -51,11 +54,15 @@ class BargainConfig:
         """Folder name for a run's records: model and messaging, e.g. claude-haiku-5-5_public-private."""
         return f"{self.model}_{self.messaging.replace('+', '-')}"
 
-    def draw(self, game_index: int) -> tuple[dict[str, int], tuple[str, ...], random.Random]:
-        """Fallbacks, proposer order, and a generator for turn order, fixed by seed and game index."""
+    def draw(self, game_index: int) -> tuple[list[dict[str, int]], tuple[str, ...], random.Random]:
+        """Each pot's fallbacks, the proposer order, and a generator for turn order.
+
+        Fixed by seed and game index, so every model and setting gets the same draw.
+        """
         rng = random.Random(f"{self.seed}:{game_index}")
-        fallbacks = {p: rng.randint(self.fallback_min, self.fallback_max) for p in self.names}
         order = tuple(rng.sample(self.names, len(self.names)))
+        fallbacks = [{p: rng.randint(self.fallback_min, self.fallback_max) for p in self.names}
+                     for _ in range(self.pots)]
         return fallbacks, order, rng
 
     def with_overrides(self, **changes) -> "BargainConfig":
@@ -75,6 +82,8 @@ class BargainConfig:
             raise ValueError("fallbacks could add up to more than the pot")
         if not 0 <= self.shrink < 1 or self.max_rounds < 1 or self.talk_turns < 0 or self.games < 1:
             raise ValueError("bad shrink, rounds, talk turns or games")
+        if self.pots < 1 or self.counter_turns < 0:
+            raise ValueError("pots must be at least 1 and counter_turns zero or more")
         if self.sandbox.mode not in ("docker", "local"):
             raise ValueError("sandbox.mode must be docker or local")
 
@@ -97,7 +106,10 @@ def load_bargain_config(path: str | Path) -> BargainConfig:
         pot=int(raw["pot"]),
         shrink=float(raw["shrink"]),
         max_rounds=int(raw["max_rounds"]),
+        pots=int(raw.get("pots", 1)),
+        draft=bool(raw.get("draft", False)),
         talk_turns=int(raw.get("talk_turns", 2)),
+        counter_turns=int(raw.get("counter_turns", 1)),
         fallback_min=int(raw["fallback_min"]),
         fallback_max=int(raw["fallback_max"]),
         messaging=raw.get("messaging", "public+private"),

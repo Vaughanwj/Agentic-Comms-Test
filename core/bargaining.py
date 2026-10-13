@@ -5,6 +5,9 @@ everyone votes yes or no; a strict majority passes it and ends the game. A
 failed round shrinks the pot and the next player in the order proposes. If no
 proposal passes by the last round, every player gets its private fallback.
 
+Optionally, the proposer first posts a non-binding draft, the others respond in
+a counter phase, and only then does the proposer make the final proposal.
+
 Pure logic: no I/O, no agents, no clock.
 """
 from __future__ import annotations
@@ -20,6 +23,8 @@ class BargainError(ValueError):
 
 class Phase(str, Enum):
     TALK = "talk"
+    DRAFT = "draft"
+    COUNTER = "counter"
     PROPOSE = "propose"
     VOTE = "vote"
     DONE = "done"
@@ -68,6 +73,7 @@ class Bargain:
         self.round = 1
         self.phase = Phase.TALK
         self.proposal: Proposal | None = None
+        self.draft: Proposal | None = None
         self.ballots: dict[str, str] = {}
         self.results: list[RoundResult] = []
         self.payoffs: dict[str, int] | None = None
@@ -94,8 +100,17 @@ class Bargain:
 
     # phases --------------------------------------------------------------
 
-    def open_proposals(self) -> None:
+    def open_draft(self) -> None:
         self._expect(Phase.TALK)
+        self.phase = Phase.DRAFT
+
+    def open_counter(self) -> None:
+        self._expect(Phase.DRAFT)
+        self.phase = Phase.COUNTER
+
+    def open_proposals(self) -> None:
+        if self.phase not in (Phase.TALK, Phase.COUNTER):
+            raise RuntimeError(f"cannot open proposals from {self.phase.value}")
         self.phase = Phase.PROPOSE
 
     def open_voting(self) -> None:
@@ -122,10 +137,20 @@ class Bargain:
             self.round += 1
             self.phase = Phase.TALK
             self.proposal = None
+            self.draft = None
             self.ballots = {}
         return result
 
     # moves ---------------------------------------------------------------
+
+    def post_draft(self, player: str, shares: dict) -> Proposal:
+        self._expect(Phase.DRAFT, "Drafts are not open right now.")
+        if player != self.proposer:
+            raise BargainError(f"It is {self.proposer}'s turn to post a draft, not yours.")
+        if self.draft is not None:
+            raise BargainError("You have already posted this round's draft.")
+        self.draft = Proposal(self.round, player, self._check_split(shares))
+        return self.draft
 
     def propose(self, player: str, shares: dict) -> Proposal:
         self._expect(Phase.PROPOSE, "Proposals are not open right now.")
@@ -133,6 +158,10 @@ class Bargain:
             raise BargainError(f"It is {self.proposer}'s turn to propose, not yours.")
         if self.proposal is not None:
             raise BargainError("You have already made this round's proposal.")
+        self.proposal = Proposal(self.round, player, self._check_split(shares))
+        return self.proposal
+
+    def _check_split(self, shares: dict) -> dict[str, int]:
         if set(shares) != set(self.players):
             raise BargainError(f"Give a share for every player: {', '.join(self.players)}.")
         clean = {}
@@ -143,8 +172,7 @@ class Bargain:
             clean[p] = value
         if sum(clean.values()) != self.pot:
             raise BargainError(f"The shares add up to {sum(clean.values())}; they must add up to the pot, {self.pot}.")
-        self.proposal = Proposal(self.round, player, clean)
-        return self.proposal
+        return clean
 
     def vote(self, player: str, choice: str) -> None:
         self._expect(Phase.VOTE, "Voting is not open right now.")
@@ -161,3 +189,9 @@ class Bargain:
             if message:
                 raise BargainError(message)
             raise RuntimeError(f"expected phase {phase.value}, in {self.phase.value}")
+
+
+def rotated(order: tuple[str, ...], steps: int) -> tuple[str, ...]:
+    """The proposer order for a later pot: the same cycle, starting `steps` places along."""
+    steps %= len(order)
+    return tuple(order[steps:] + order[:steps])
