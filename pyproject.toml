@@ -1,0 +1,16 @@
+[project]
+name = "battleship-channel-experiment"
+version = "0.1.0"
+description = "Two LLM agents play Battleship over a socket or shared files; measures coordination and honesty."
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=1.13,<2",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

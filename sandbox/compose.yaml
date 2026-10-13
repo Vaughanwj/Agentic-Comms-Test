@@ -1,0 +1,28 @@
+# Sandbox infrastructure. Start once before running games in docker mode:
+#   docker compose -f sandbox/compose.yaml up -d --build
+#
+# Game containers are started per game by harness.run_cell / run_all with
+# `docker run --rm --network battleship_sandbox ...`. That network is internal:
+# no route out except the egress proxy, which only tunnels to api.anthropic.com:443.
+name: battleship
+
+services:
+  egress-proxy:
+    build:
+      context: ..
+      dockerfile: sandbox/Dockerfile
+    image: battleship-experiment:phase1
+    command: ["python", "sandbox/egress_proxy.py"]
+    environment:
+      ALLOWED_HOSTS: "api.anthropic.com:443"
+    read_only: true
+    networks:
+      - sandbox
+      - outside
+    restart: unless-stopped
+
+networks:
+  sandbox:
+    name: battleship_sandbox
+    internal: true
+  outside: {}
