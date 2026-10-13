@@ -44,6 +44,20 @@ def test_parallel_games_each_get_their_own_record(config, tmp_path):
     assert len(list((tmp_path / "run1").glob("*/game_*.jsonl"))) == 4
 
 
+def test_resume_skips_finished_games_and_replays_aborted_ones(config, tmp_path):
+    config = config.with_overrides(records_dir=tmp_path, socket_port=0, sandbox=Sandbox("local", "", "", None))
+    plan = [(config, 0), (config, 1)]
+    cells.run_games(plan, "run1", "scripted")
+    aborted = cells.game_path(tmp_path, "run1", config.cell, 1)
+    aborted.write_text('{"kind": "game_start"}\n{"kind": "game_end", "end_reason": "error"}\n', encoding="utf-8")
+
+    results = cells.run_games(plan, "run1", "scripted", resume=True)
+    assert [r.game_index for r in results] == [1] and results[0].end_reason == "fleet_sunk"
+    assert cells.finished(aborted)
+    assert (aborted.parent / "aborted_game_001_1.jsonl").exists()
+    assert sorted(p.name for p in aborted.parent.glob("game_*.jsonl")) == ["game_000.jsonl", "game_001.jsonl"]
+
+
 def test_existing_record_is_never_overwritten(config, tmp_path):
     config = config.with_overrides(records_dir=tmp_path, sandbox=Sandbox("local", "", "", None))
     path = cells.game_path(tmp_path, "run1", config.cell, 0)

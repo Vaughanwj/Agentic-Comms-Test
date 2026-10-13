@@ -21,6 +21,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sandbox", choices=["docker", "local"], help="override sandbox.mode")
     parser.add_argument("--agent", choices=["llm", "scripted"], default="llm")
     parser.add_argument("--parallel", type=int, default=1, help="games to play at once (default 1)")
+    parser.add_argument("--resume", action="store_true",
+                        help="continue an existing --run-id: skip finished games, replay aborted ones")
     parser.add_argument("--run-id", default=None)
     args = parser.parse_args(argv)
 
@@ -29,13 +31,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.sandbox else None
     config = config.with_overrides(transport=args.transport, condition=args.condition,
                                    games_per_cell=args.games, sandbox=sandbox)
+    if args.resume and not args.run_id:
+        parser.error("--resume needs the --run-id of the run to continue")
     run_id = args.run_id or new_run_id()
     manifest = write_manifest(config, run_id, args.agent, [config.cell])
     print(f"Run {run_id}: {config.games_per_cell} games of {config.cell} ({args.agent}, {config.sandbox.mode})")
     print(f"Manifest: {manifest}")
 
     plan = [(config, i) for i in range(config.games_per_cell)]
-    results = run_games(plan, run_id, args.agent, args.parallel)
+    results = run_games(plan, run_id, args.agent, args.parallel, args.resume)
     failed = sum(1 for r in results if r.error_type)
     print(f"Done: {len(results)} games, {failed} aborted. Records in {manifest.parent}")
     return 1 if failed or len(results) < len(plan) else 0

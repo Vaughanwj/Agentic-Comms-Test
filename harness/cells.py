@@ -27,6 +27,7 @@ def game_path(records_dir: Path, run_id: str, cell: str, game_index: int) -> Pat
 
 
 def write_manifest(config: Config, run_id: str, agent_kind: str, cells: list[str]) -> Path:
+    """Write the run manifest. A resumed run gets manifest_2.json and so on; nothing is overwritten."""
     run_dir = Path(config.records_dir) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
@@ -41,15 +42,43 @@ def write_manifest(config: Config, run_id: str, agent_kind: str, cells: list[str
         "config": config.snapshot(),
     }
     path = run_dir / "manifest.json"
+    n = 1
+    while path.exists():
+        n += 1
+        path = run_dir / f"manifest_{n}.json"
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return path
 
 
-def play(config: Config, game_index: int, run_id: str, agent_kind: str) -> GameResult:
-    """Play one game of config's cell, locally or in a fresh container."""
+def finished(path: Path) -> bool:
+    """True if this record holds a game that ended normally (not aborted by an error)."""
+    if not path.exists():
+        return False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if '"kind": "game_end"' in line:
+            return json.loads(line).get("end_reason") != "error"
+    return False
+
+
+def set_aside(path: Path) -> Path:
+    """Keep an aborted game's record under a name the analysis ignores."""
+    n = 1
+    while (target := path.with_name(f"aborted_{path.stem}_{n}.jsonl")).exists():
+        n += 1
+    path.rename(target)
+    return target
+
+
+def play(config: Config, game_index: int, run_id: str, agent_kind: str, resume: bool = False) -> GameResult:
+    """Play one game of config's cell, locally or in a fresh container.
+
+    With resume, an aborted record for this game is set aside and the game replayed.
+    """
     out = game_path(config.records_dir, run_id, config.cell, game_index)
     if out.exists():
-        raise FileExistsError(f"{out} already exists; records are append-only, pick a new run id")
+        if not resume or finished(out):
+            raise FileExistsError(f"{out} already exists; records are append-only, pick a new run id")
+        set_aside(out)
     if config.sandbox.mode == "local":
         return run_game(config, game_index, out, factory_for(agent_kind, config))
     return _play_in_docker(config, game_index, run_id, agent_kind, out)
@@ -91,11 +120,17 @@ def _play_in_docker(config: Config, game_index: int, run_id: str, agent_kind: st
     return GameResult(**data)
 
 
-def run_games(plan: list[tuple[Config, int]], run_id: str, agent_kind: str, parallel: int = 1) -> list[GameResult]:
+def run_games(plan: list[tuple[Config, int]], run_id: str, agent_kind: str, parallel: int = 1,
+              resume: bool = False) -> list[GameResult]:
     """Play every (cell config, game index), up to `parallel` at a time, starting them in plan order.
 
-    Stops starting new games after an error that would repeat for every game.
+    Stops starting new games after an error that would repeat for every game. With resume,
+    games that already finished in this run are skipped and aborted ones are replayed.
     """
+    if resume:
+        done = [(c, i) for c, i in plan if finished(game_path(c.records_dir, run_id, c.cell, i))]
+        plan = [p for p in plan if p not in done]
+        print(f"Resuming {run_id}: {len(done)} games already finished, {len(plan)} to play.", flush=True)
     if parallel > 1:
         # Games in one process cannot share the fixed port; each container has its own localhost.
         plan = [(c.with_overrides(socket_port=0) if c.sandbox.mode == "local" else c, i) for c, i in plan]
@@ -106,15 +141,16 @@ def run_games(plan: list[tuple[Config, int]], run_id: str, agent_kind: str, para
     def one(cell_config: Config, game_index: int) -> None:
         if stop.is_set():
             return
-        result = play(cell_config, game_index, run_id, agent_kind)
+        result = play(cell_config, game_index, run_id, agent_kind, resume)
         with lock:
             results.append(result)
             status = result.end_reason + (f" ({result.error_type}: {result.error_message})" if result.error_type else "")
             print(f"[{len(results)}/{len(plan)}] {result.cell} game {game_index}: {status}; winner {result.winner}",
                   flush=True)
-            if result.error_type in FATAL_ERRORS or result.error_type == "DockerError":
+            if (result.error_type in FATAL_ERRORS or result.error_type == "DockerError") and not stop.is_set():
                 stop.set()
-                print("Stopping: this error would repeat for every game.", file=sys.stderr, flush=True)
+                print("Stopping: this error would repeat for every game. Games already running will finish or "
+                      "fail; continue later with --resume.", file=sys.stderr, flush=True)
 
     with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
         for future in [pool.submit(one, c, i) for c, i in plan]:
