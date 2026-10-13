@@ -29,7 +29,7 @@ class TappedTransport(TransportPort):
     def receive(self, recipient: str) -> list[Message]:
         messages = self.inner.receive(recipient)
         for message in messages:
-            self._tap("recv", message)
+            self._tap("recv", message, receiver=recipient)
         return messages
 
     def close(self) -> None:
@@ -39,7 +39,8 @@ class TappedTransport(TransportPort):
     def describe(self) -> dict:
         return self.inner.describe()
 
-    def _tap(self, direction: str, message: Message) -> None:
+    def _tap(self, direction: str, message: Message, receiver: str | None = None) -> None:
+        extra = {"receiver": receiver} if receiver else {}
         self.recorder.record(
             "tap",
             event=direction,
@@ -51,4 +52,5 @@ class TappedTransport(TransportPort):
             n_bytes=len(message.wire),
             wire_b64=base64.b64encode(message.wire).decode("ascii"),
             body=message.body,
+            **extra,
         )

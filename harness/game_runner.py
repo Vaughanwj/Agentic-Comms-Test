@@ -16,11 +16,12 @@ from adapters.tapped_transport import TappedTransport
 from core.game import PLAYERS, EndReason, Game
 from harness.agents import AgentFactory
 from harness.config import Config
+from harness.activation import Activations
 from harness.detectors import Detector
 from harness.prompts import (FIRST_TURN_PROMPT, PLACEMENT_PROMPT, TURN_PROMPT, build_system_prompt,
                              game_rules_file)
 from harness.tools import AgentTools, tool_specs
-from ports.agent import AgentPort, AgentStep, ToolOutcome
+from ports.agent import AgentPort
 from ports.recorder import RecorderPort
 
 HARNESS_VERSION = "phase1-1"
@@ -91,7 +92,7 @@ class _GameRun:
             p: agent_factory(p, self.game.opponent(p), game_index, f"{config.bait_dir}/{self.game.opponent(p)}.json")
             for p in PLAYERS
         }
-        self.pending: dict[str, list[ToolOutcome]] = {p: [] for p in PLAYERS}
+        self.activations = Activations(recorder, config.limits.max_steps_per_activation)
         self.error: Exception | None = None
 
     def run(self) -> GameResult:
@@ -158,40 +159,7 @@ class _GameRun:
             self.game.abort(EndReason.PLACEMENT_FAILED)
 
     def _activation(self, player: str, prompt: str, activation: int, phase: str) -> None:
-        agent, tools = self.agents[player], self.tools[player]
-        self.recorder.record("activation_start", player=player, activation=activation, phase=phase, prompt=prompt)
-        carried, self.pending[player] = self.pending[player], []
-        step = agent.step(prompt=prompt, tool_outcomes=carried or None)
-        steps = 1
-        self._record_step(player, activation, steps, step)
-        ended_by = step.stop_reason
-        while step.tool_calls:
-            outcomes = [tools.dispatch(call, activation) for call in step.tool_calls]
-            if steps >= self.config.limits.max_steps_per_activation:
-                # The calls ran; their results reach the agent with its next prompt.
-                self.pending[player] = outcomes
-                ended_by = "step_cap"
-                break
-            step = agent.step(tool_outcomes=outcomes)
-            steps += 1
-            self._record_step(player, activation, steps, step)
-            ended_by = step.stop_reason
-        self.recorder.record("activation_end", player=player, activation=activation, phase=phase,
-                             steps=steps, ended_by=ended_by)
-
-    def _record_step(self, player: str, activation: int, index: int, step: AgentStep) -> None:
-        self.recorder.record(
-            "agent_step",
-            player=player,
-            activation=activation,
-            step=index,
-            stop_reason=step.stop_reason,
-            text=step.text,
-            reasoning=step.reasoning,
-            tool_calls=[{"call_id": c.call_id, "name": c.name, "arguments": c.arguments} for c in step.tool_calls],
-            usage=step.usage,
-            raw=step.raw,
-        )
+        self.activations.run(player, self.agents[player], self.tools[player].dispatch, prompt, activation, phase)
 
     def _finish(self) -> None:
         try:
