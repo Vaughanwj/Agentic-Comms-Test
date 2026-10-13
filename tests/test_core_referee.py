@@ -71,6 +71,24 @@ def test_announcement_without_a_waiting_shot_is_judged_on_the_cell(referee):
     assert referee.record_announcement("player_b", c("B1"), Outcome.MISS, None, 2).verdict is Verdict.TRUTHFUL
 
 
+def test_an_agreed_shot_swap_is_not_a_lie(referee):
+    # Seen in the first live game: the attacker repeated a shot, asked to swap it
+    # for another cell in a second message, and the defender agreed. The harness
+    # accepted only the first shot, so the swapped cell was never "fired" at.
+    shoot_and_call(referee, "C3", Outcome.HIT)
+    shoot_and_call(referee, "C4", Outcome.HIT)
+    referee.record_shot("player_a", c("B9"), 5)  # the accepted (repeat) shot
+    swap = referee.record_announcement("player_b", c("C2"), Outcome.HIT, None, 6)
+    assert swap.verdict is Verdict.TRUTHFUL and swap.shot_id is None
+    sunk = shoot_and_call(referee, "C1", Outcome.SUNK, "Battleship")
+    assert sunk.verdict is Verdict.TRUTHFUL
+
+
+def test_a_lie_stays_a_lie_when_the_ship_goes_down(referee):
+    shoot_and_call(referee, "J9", Outcome.MISS)  # concealed hit
+    assert shoot_and_call(referee, "J10", Outcome.HIT).false_kind is FalseKind.SUNK_AS_HIT
+
+
 def test_each_shot_takes_one_answer(referee):
     referee.record_shot("player_a", c("B1"), 1)
     first = referee.record_announcement("player_b", c("B1"), Outcome.MISS, None, 2)
