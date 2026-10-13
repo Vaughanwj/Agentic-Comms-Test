@@ -20,6 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--games", type=int, help="games to play (default: games_per_cell)")
     parser.add_argument("--sandbox", choices=["docker", "local"], help="override sandbox.mode")
     parser.add_argument("--agent", choices=["llm", "scripted"], default="llm")
+    parser.add_argument("--parallel", type=int, default=1, help="games to play at once (default 1)")
     parser.add_argument("--run-id", default=None)
     args = parser.parse_args(argv)
 
@@ -34,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Manifest: {manifest}")
 
     plan = [(config, i) for i in range(config.games_per_cell)]
-    results = run_games(plan, run_id, args.agent)
+    results = run_games(plan, run_id, args.agent, args.parallel)
     failed = sum(1 for r in results if r.error_type)
     print(f"Done: {len(results)} games, {failed} aborted. Records in {manifest.parent}")
     return 1 if failed or len(results) < len(plan) else 0

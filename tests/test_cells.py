@@ -36,6 +36,14 @@ def test_docker_mode_runs_each_game_in_a_fresh_sealed_container(config, tmp_path
     assert cmd[cmd.index("--transport") + 1] == "file" and cmd[cmd.index("--condition") + 1] == "C"
 
 
+def test_parallel_games_each_get_their_own_record(config, tmp_path):
+    config = config.with_overrides(records_dir=tmp_path, socket_port=47001, sandbox=Sandbox("local", "", "", None))
+    plan = [(config.with_overrides(transport=t), i) for t in ("socket", "file") for i in range(2)]
+    results = cells.run_games(plan, "run1", "scripted", parallel=4)
+    assert len(results) == 4 and all(r.end_reason == "fleet_sunk" for r in results)
+    assert len(list((tmp_path / "run1").glob("*/game_*.jsonl"))) == 4
+
+
 def test_existing_record_is_never_overwritten(config, tmp_path):
     config = config.with_overrides(records_dir=tmp_path, sandbox=Sandbox("local", "", "", None))
     path = cells.game_path(tmp_path, "run1", config.cell, 0)

@@ -5,6 +5,8 @@ import json
 import os
 import subprocess
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,6 +37,7 @@ def write_manifest(config: Config, run_id: str, agent_kind: str, cells: list[str
         "cells": cells,
         "games_per_cell": config.games_per_cell,
         "git_commit": _git_commit(),
+        "docker_image_id": _image_id(config) if config.sandbox.mode == "docker" else None,
         "config": config.snapshot(),
     }
     path = run_dir / "manifest.json"
@@ -88,18 +91,43 @@ def _play_in_docker(config: Config, game_index: int, run_id: str, agent_kind: st
     return GameResult(**data)
 
 
-def run_games(plan: list[tuple[Config, int]], run_id: str, agent_kind: str) -> list[GameResult]:
-    """Play every (cell config, game index) in order. Stops early on errors that would repeat."""
-    results = []
-    for n, (cell_config, game_index) in enumerate(plan, 1):
+def run_games(plan: list[tuple[Config, int]], run_id: str, agent_kind: str, parallel: int = 1) -> list[GameResult]:
+    """Play every (cell config, game index), up to `parallel` at a time, starting them in plan order.
+
+    Stops starting new games after an error that would repeat for every game.
+    """
+    if parallel > 1:
+        # Games in one process cannot share the fixed port; each container has its own localhost.
+        plan = [(c.with_overrides(socket_port=0) if c.sandbox.mode == "local" else c, i) for c, i in plan]
+    results: list[GameResult] = []
+    lock = threading.Lock()
+    stop = threading.Event()
+
+    def one(cell_config: Config, game_index: int) -> None:
+        if stop.is_set():
+            return
         result = play(cell_config, game_index, run_id, agent_kind)
-        results.append(result)
-        status = result.end_reason + (f" ({result.error_type}: {result.error_message})" if result.error_type else "")
-        print(f"[{n}/{len(plan)}] {result.cell} game {game_index}: {status}; winner {result.winner}", flush=True)
-        if result.error_type in FATAL_ERRORS or result.error_type == "DockerError":
-            print("Stopping: this error would repeat for every game.", file=sys.stderr)
-            break
+        with lock:
+            results.append(result)
+            status = result.end_reason + (f" ({result.error_type}: {result.error_message})" if result.error_type else "")
+            print(f"[{len(results)}/{len(plan)}] {result.cell} game {game_index}: {status}; winner {result.winner}",
+                  flush=True)
+            if result.error_type in FATAL_ERRORS or result.error_type == "DockerError":
+                stop.set()
+                print("Stopping: this error would repeat for every game.", file=sys.stderr, flush=True)
+
+    with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
+        for future in [pool.submit(one, c, i) for c, i in plan]:
+            future.result()
     return results
+
+
+def _image_id(config: Config) -> str | None:
+    try:
+        return subprocess.run(["docker", "image", "inspect", "--format", "{{.Id}}", config.sandbox.image],
+                              capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
 
 
 def _git_commit() -> str | None:
