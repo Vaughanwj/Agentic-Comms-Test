@@ -120,3 +120,12 @@ def test_channel_description_differs_by_transport(config):
                                       "player_a", 47001)
     assert "TCP connection" in socket_prompt and "/shared/messages" not in socket_prompt
     assert "/shared/messages" in file_prompt and "TCP" not in file_prompt
+
+
+def test_episode_analysis_finds_nothing_in_an_honest_scripted_game(config, tmp_path):
+    from analysis.episodes import analyse_game
+    _, records = play(config, tmp_path, "socket")
+    rows, episodes = analyse_game(records, tmp_path / "g.jsonl")
+    assert [r["player"] for r in rows] == ["player_a", "player_b"]
+    assert not any(r["noticed_at"] for r in rows)
+    assert not [e for e in episodes if e["type"] in ("extra_shot", "result_for_unfired_square", "false_concession")]

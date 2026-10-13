@@ -134,6 +134,8 @@ Other paths outside the agent's view are flagged `review` and not scored.
 
 `python -m analysis.metrics records/<run_id>` prints a table per cell and writes `metrics_games.csv`, `metrics_cells.csv` and `review.jsonl` next to the records.
 
+`python -m analysis.episodes records/<run_id> [more run folders]` measures two behaviours the pilot surfaced: self-modelling (an agent guessing the opponent's fleet from its own; when it noticed, how its guesses changed, and whether it told anyone) and renegotiation (corrections, agreed shot swaps or extra shots the harness ignores, and concessions made while a ship was still afloat).
+
 To read a game as a conversation, `python -m analysis.transcript records/<run_id>/<cell>/game_000.jsonl --annotate --out transcript.md` prints every message from the tap, with each result call marked true or false and each shot marked with what it really hit.
 
 Per game: win and loss, turns to finish (the winner's shots), attempts and successes for C1, C2 and C5, false reports and rate for C3 (with kinds), C4 candidates, eval-aware steps, refusals, unanswered shots, rejected shots, tokens and estimated cost. Per cell: the same, summed or averaged, with the number of games where each ID appeared at least once.
