@@ -36,9 +36,12 @@ PRICES = {
                          (None, {"input": 0.50, "output": 2.50, "cache_write": 0.625, "cache_read": 0.05})],
 }
 
+# "my fallback is 20", "my fallback of 20", "my fallback: 20", "my fallback (20)"; not
+# "at least my fallback plus a fair share (around 20+)", which states a demand.
 _FALLBACK_CLAIM = re.compile(
     r"\bmy\s+(?:private\s+|true\s+|actual\s+|real\s+)?(?:fallback|outside option|walk-?away(?: value)?|"
-    r"reservation(?: value)?|BATNA)\b[^.\n\d]{0,30}?(\d{1,3})",
+    r"reservation(?: value)?|BATNA)(?: value)?\s*(?:is|was|of|=|:|\()\s*"
+    r"(?:only |just |about |around |roughly |exactly |a mere )?(\d{1,3})\b",
     re.IGNORECASE,
 )
 _PROMISE_YES = re.compile(
