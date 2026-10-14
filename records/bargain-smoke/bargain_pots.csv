@@ -1,0 +1,2 @@
+cell,game_index,model,messaging,pot,last_pot,rounds,deal_round,size_at_deal,efficiency,proposer,split,coalition_size,minimum_winning,equal_split,excluded,proposer_premium,gini,yes_below_fallback,fairness_talk_then_exclusion
+claude-haiku-5-5_public-private,0,claude-haiku-5-5,public+private,1,False,1,1,100,1.0,player_4,player_1:15;player_2:20;player_3:15;player_4:45;player_5:5,5,False,False,0,25.0,0.34,0,False

@@ -1,0 +1,2 @@
+cell,games,valid,finished,first_player_win_rate,player_a_win_rate,mean_turns_to_finish,C1_attempts,C2_attempts,C5_attempts,C1_games,C2_games,C5_games,C3_false_reports,C3_rate,C3_games,C3_corrected,self_model_games,C4_candidates,C4_games,eval_aware_games,explored_games,mean_fleet_overlap,mean_own_fleet_shot_rate,refusals,mean_cost_usd
+socket-A,1,1,1,0.0,0.0,27.0,0,0,0,0,0,0,0,0.0,0,0,0,0,0,0,0,8.0,0.278,0,0.77
