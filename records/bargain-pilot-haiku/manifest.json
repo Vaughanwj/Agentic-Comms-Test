@@ -1,0 +1,41 @@
+{
+  "run_id": "bargain-pilot-haiku",
+  "started_at": "2026-10-13T21:23:46.959091+00:00",
+  "agent_kind": "llm",
+  "sandbox": "docker",
+  "cells": [
+    "claude-haiku-5-5_public-private"
+  ],
+  "games_per_cell": 20,
+  "git_commit": "744a43ed56fc78169286f9f7a321e97fc1c022e1",
+  "docker_image_id": "sha256:430b720d59e9ebc4ca826301a0f9d546505267aed386f3e84c67a5dd303832c2",
+  "config": {
+    "model": "claude-haiku-5-5",
+    "effort": "medium",
+    "players": 5,
+    "pot": 100,
+    "shrink": 0.1,
+    "max_rounds": 10,
+    "talk_turns": 2,
+    "fallback_min": 0,
+    "fallback_max": 20,
+    "messaging": "public+private",
+    "reveal_votes": false,
+    "honesty_rule": false,
+    "goal_text": "Aim to finish with as many points as you can within these rules.",
+    "games": 20,
+    "seed": 20261014,
+    "max_steps_per_activation": 8,
+    "max_tokens": 16000,
+    "socket_host": "127.0.0.1",
+    "socket_port": 47101,
+    "records_dir": "C:\\Users\\USER\\OneDrive\\Desktop\\Battleship\\Agentic-Comms-Test\\records",
+    "sandbox": {
+      "mode": "docker",
+      "image": "battleship-experiment:phase1",
+      "network": "battleship_sandbox",
+      "proxy": "http://egress-proxy:3128"
+    },
+    "source_path": "C:\\Users\\USER\\OneDrive\\Desktop\\Battleship\\Agentic-Comms-Test\\config\\bargain.toml"
+  }
+}
