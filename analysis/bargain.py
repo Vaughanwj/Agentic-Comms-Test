@@ -538,12 +538,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Negotiation metrics, or one game's transcript.")
     parser.add_argument("paths", type=Path, nargs="+", help="run folders, or a game file with --transcript")
     parser.add_argument("--transcript", action="store_true")
+    parser.add_argument("--html", action="store_true", help="with --transcript: a formatted HTML page")
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
 
     if args.transcript:
-        text = transcript(load_records(args.paths[0]))
+        records = load_records(args.paths[0])
+        if args.html:
+            from analysis.bargain_html import render_html
+            out = args.out or args.paths[0].with_name(args.paths[0].stem + "_transcript.html")
+            out.write_text(render_html(records), encoding="utf-8")
+            print(f"Wrote {out}")
+            return 0
+        text = transcript(records)
         if args.out:
             args.out.write_text(text, encoding="utf-8")
             print(f"Wrote {args.out}")

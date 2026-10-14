@@ -185,6 +185,7 @@ python -m harness.bargain.run --games 10 --parallel 4
 python -m harness.bargain.run --games 5 --model claude-opus-5-5 --parallel 4
 python -m analysis.bargain records/<run_id>
 python -m analysis.bargain --transcript records/<run_id>/<cell>/game_000.jsonl --out transcript.md
+python -m analysis.bargain --transcript --html records/<run_id>/<cell>/game_000.jsonl   # formatted page: pots fold open, drafts vs finals, secret ballots
 ```
 
 The config is `config/bargain.toml` (Haiku 5.5 by default). A game index draws the same fallbacks, proposer order and turn order for every model and messaging setting, so runs can be compared game by game.
