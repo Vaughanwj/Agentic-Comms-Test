@@ -482,14 +482,18 @@ def table(cells: list[dict]) -> str:
 
 def transcript(records: list[dict]) -> str:
     g = _Game(records)
+    single = g.v1 or g.cfg.get("pots", 1) == 1
+    payoffs = ", ".join(f"{p} {v}" for p, v in (g.end.get("payoffs") or {}).items())
     lines = [f"# {g.start['cell']} game {g.start['game_index']}", "",
-             f"- Proposer order (pot 1): {', '.join(g.start['proposer_order'])}",
+             f"- Proposer order{'' if single else ' (pot 1)'}: {', '.join(g.start['proposer_order'])}",
              f"- Result: {g.end.get('end_reason')}"
-             + (f"; totals " + ", ".join(f"{p} {v}" for p, v in g.end["payoffs"].items()) if g.end.get("payoffs")
-                else ""), ""]
-    if g.v1 or "fallbacks_by_pot" not in g.start:
+             + (f" in round {g.end['deal_round']}" if single and g.end.get("deal_round") else "")
+             + (f"; {'payoffs' if single else 'totals'} {payoffs}" if payoffs else "")]
+    if single:
         lines += [f"- Fallbacks (private): " + ", ".join(f"{p} {v}" for p, v in g.start["fallbacks"].items()), "",
                   "## Round 1", ""]
+    else:
+        lines.append("")
     for r in records:
         kind = r["kind"]
         if kind == "pot_start":
@@ -511,7 +515,7 @@ def transcript(records: list[dict]) -> str:
             lines += [f"**Result:** {'passed' if res['passed'] else 'failed'} ({res['yes']} yes, {res['no']} no). "
                       f"Secret ballots: {votes}", ""]
             if not res["passed"] and res["round"] < g.cfg["max_rounds"]:
-                heading = "###" if not g.v1 and "fallbacks_by_pot" in g.start else "##"
+                heading = "##" if single else "###"
                 lines += [f"{heading} Round {res['round'] + 1}", ""]
         elif kind == "pot_end" and g.cfg.get("pots", 1) > 1:
             lines += ["Totals after this pot: " + ", ".join(f"{p} {v}" for p, v in r["totals"].items()), ""]
